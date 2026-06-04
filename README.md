@@ -1,186 +1,94 @@
-# GitHub Backup 🛡️
+# sitecheck — Host accessibility monitor
 
-A Python automation tool to back up all your GitHub repositories, keeping them synced with a "hard reset" to the remote HEAD. It features secure token storage and Telegram notifications.
+sitecheck is a small Python utility that monitors HTTP endpoints and reports accessibility via `tglogging` (Telegram) or the console.
 
-Warning: the script does use the "repo" scope which includes the write permission, but also that means the token is stored locally.
-This is a big security risk. Make sure to only run on a machine you fully trust.
+Key features
+- Accepts short positional target arguments: `URL,interval[,http_code]` (e.g. `google.com,30` — `http_code` defaults to `200`).
+- Continuous monitor: the CLI starts a long-running loop that checks each host on its configured interval.
+- Docker-friendly: the container accepts a `TARGETS` JSON environment variable to declare targets.
+- Notifications: integrates with `tglogging` to send messages to Telegram when configured; falls back to console logging otherwise.
 
----
-
-## 🎯 What It Does
-
-- **Authenticates** securely using GitHub's Device Flow (no manual token pasting).
-- **Encrypts** your access token locally using Fernet (AES-128).
-- **Discovers** all repositories owned by your GitHub account.
-- **Clones & Updates** repositories to a local backup directory.
-- **Hard Sync**: Automatically resets local copies to match the remote `HEAD`, ensuring a clean backup.
-- **Notifies** via Telegram about backup status and errors using `tglogging`.
-
-Intended for automated, secure backups of your entire GitHub profile!
-
----
-
-## 🚀 Quick Start
-
-### Nix Development Environment (Recommended) ⭐
-
-This project uses **Nix** for reproducible development environments. The `flake.nix` defines a devShell with all dependencies:
+## Install
 
 ```bash
-# Enter the Nix dev shell (installs Python, git, etc.), and the first time
-direnv allow
-
-# Or with nix-shell
-nix-shell
-```
-
-### ⚙️ Manual setup (no Nix)
-- Python 3.8+
-- `git` CLI installed
-- `pip`
-
-```bash
-# Create virtual environment
 python -m venv env
-# Windows: env\Scripts\activate
-source env/bin/activate
-# Install deps
+source env/bin/activate  # on Windows: env\Scripts\activate
 pip install -r requirements.txt
 ```
 
-### 🗝️ Configuration
-Create a `.env` in the project root:
-```env
-BACKUP_DIR="./backups"
-TOKEN_KEY_FILE="./.secrets/github-backup.key"
-TOKEN_ENCRYPTED_FILE="./.tokEncEn" (optional default)
+## Run locally
 
-# (optional – remove token to suppress)
-TELEGRAM_BOT_TOKEN="..."
-TELEGRAM_CHAT_IDS_INFO="123456"
-TELEGRAM_CHAT_IDS_ERROR="123456"
-TELEGRAM_CHAT_IDS_DEBUG=
-TELEGRAM_CHAT_IDS_PRIORITY_INFO=
-TELEGRAM_CHAT_IDS_WARNING=
-TELEGRAM_CHAT_IDS_CRITICAL=
-
-# (optional – remove to suppress)
-LOG_FILE="backup.log"
-```
----
-
-## ▶️ Running the Script
-
-### Initial Config
-The first time you run it, you want to create a key to encrypt the token.
 ```bash
-mkdir -p .secrets/ && python -c 'from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())' > .secrets/github-backup.key
-
+python -m sitecheck -v google.com,30 httpbin.org/status/204,60,204
 ```
-Follow the URL and enter the code shown in your terminal or Telegram.
 
-### Direct execution
+- `-v` / `--verbose` enables more verbose output.
+- Each positional target must be `URL,interval[,http_code]`.
+- If the URL does not include a scheme, `https://` is added automatically.
+
+## Docker usage
+
+Build the image:
+
 ```bash
-python -m github_backup run
+docker build -t sitecheck .
 ```
 
-### Cron (Linux/macOS)
-```cron
-0 3 * * * cd /path/to/github_backup && ./env/bin/python -m github_backup run >> logs/cron.log 2>&1
-```
+Run with `TARGETS` JSON:
 
----
-
-## 🛠️ Development Workflow
-
-### Project layout
-```
-github_backup/
-├── src/
-│   └── github_backup/
-│       ├── stages/
-│       │   ├── auth.py     # Device Flow & Encryption
-│       │   └── backup.py   # Cloning & Updating logic
-│       ├── cli.py          # CLI Entrypoint
-│       └── config.py       # Env-based config
-├── requirements.txt
-├── Dockerfile
-└── README.md
-```
-
-### Common commands
 ```bash
-# Run backup only (assumes already authenticated)
-python -m github_backup backup
-
-# Enable debug logging
-python -m github_backup -v run
+docker run --rm -e TARGETS='[
+  {"host":"https://google.com","interval":30},
+  {"host":"https://example.com/health","interval":60,"http_code":200}
+]' sitecheck
 ```
 
----
+The container entrypoint is `src/docker_entry.py`, which validates `TARGETS` and then executes `python -m sitecheck`.
 
-## 🐳 Docker / Podman support
-```bash
-# Build image
-podman build -t github_backup .
+## TARGETS JSON format
 
-# Run container (mounting the key and backup directory)
-podman run --rm \
-  --env-file .env \
-  -v "$PWD/.secrets/github-backup.key:/app/secrets/key:ro" \
-  -v "$PWD/backups:/app/backups" \
-  github_backup
+`TARGETS` should be a JSON list of objects:
+
+- `host` (string) — URL to check.
+- `interval` (integer seconds) — how often to check this endpoint.
+- `http_code` (optional integer) — expected HTTP status code. Defaults to `200`.
+
+Example:
+
+```json
+[
+  {"host":"https://google.com","interval":30},
+  {"host":"https://example.com/health","interval":60,"http_code":200}
+]
 ```
 
----
+## Environment variables
 
-## ⚙️ Configuration Options
+- `TARGETS` — JSON list used by the Docker entrypoint.
+- `TELEGRAM_BOT_TOKEN` — Telegram bot token for notifications.
+- `TELEGRAM_CHAT_IDS_DEBUG` — comma-separated chat IDs for debug messages.
+- `TELEGRAM_CHAT_IDS_INFO` — comma-separated chat IDs for info messages.
+- `TELEGRAM_CHAT_IDS_WARNING` — comma-separated chat IDs for warning messages.
+- `TELEGRAM_CHAT_IDS_ERROR` — comma-separated chat IDs for error messages.
+- `TELEGRAM_CHAT_IDS_CRITICAL` — comma-separated chat IDs for critical messages.
+- `LOG_FILE` — optional local log file path.
 
-| Variable | Default | Description                                                                 |
-|----------|---------|-----------------------------------------------------------------------------|
-| `BACKUP_DIR` | (required) | (not used in Docker, set via Volume) Path where repositories will be cloned |
-| `TOKEN_KEY_FILE` | (required) | (not used in Docker, set via Volume) Path to the Fernet encryption key file |
-| `TOKEN_ENCRYPTED_FILE`| `./.tokEncEn` | (not used in Docker) Path to store the encrypted GitHub token               |
-| `TELEGRAM_BOT_TOKEN` | (optional) | Telegram bot token for notifications                                        |
-| `TELEGRAM_CHAT_IDS_*` | (optional) | Comma-separated chat IDs for different log levels                           |
-| `LOG_FILE` | (optional) | Path to a file for logging output                                           |
+If `tglogging` is unavailable or no Telegram config is set, output is logged to the console.
 
----
+## Files of interest
 
-## 🛡️ Security Features
-Warning: the script does use the "repo" scope which includes the write permission, but also that means the token is stored locally.
-This is a big security risk. **Make sure to only run on a machine you fully trust.**
+- `src/sitecheck/cli.py` — CLI entrypoint, parses positional targets and starts the monitor.
+- `src/sitecheck/monitor.py` — core check functions and monitoring loop.
+- `src/sitecheck/logger.py` — helper that configures `tglogging` or falls back to standard logging.
+- `src/docker_entry.py` — container-compatible entrypoint that validates `TARGETS` and launches the monitor.
 
-- **Fernet Encryption**: Your GitHub token is never stored in plain text. It is encrypted using a key you generate and store separately.
-- **Device Flow**: No need to create Personal Access Tokens manually; the app uses GitHub's official OAuth device flow.
-- **Token Scrubbing**: Error messages and logs are automatically scrubbed to remove any sensitive token information before logging or sending to Telegram.
+## Notes
 
----
+- The CLI is intentionally minimal: positional target args immediately start the monitor loop.
+- `requests` is required for network checks and is installed from `requirements.txt`.
+- `tglogging` is optional at runtime; if missing, the logger helper falls back to standard console logging.
 
-## 📝 Logging
+## License
 
-The script uses `tglogging` to provide structured logs to both console/files and Telegram.
+MIT
 
-Example log output:
-```
-[INFO] Authenticated as: your-username
-[INFO] Fetching owned repositories for user: your-username
-[INFO] Cloning owner/repo-a.
-[INFO] ✅ Successfully cloned owner/repo-a
-[INFO] Fetching and updating owner/repo-b.
-[INFO] ✅ Successfully updated and reset owner/repo-b
-[PRIORITY_INFO] Backup Summary: 2 repos found, 1 cloned, 1 updated, 0 failed.
-```
-
----
-
-## 📄 License
-MIT – feel free to use & modify!
-
----
-
-## 🤝 Contributing
-1. Fork the repo
-2. Create a feature branch
-3. Make your changes
-4. Submit a pull request
