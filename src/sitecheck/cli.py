@@ -3,7 +3,7 @@ import sys
 from urllib.parse import urlparse
 
 from .logger import get_tg_logger
-from .monitor import run_once
+from .monitor import run_forever
 
 
 def _ensure_scheme(url: str) -> str:
@@ -60,5 +60,5 @@ def main(argv=None):
     for t in parsed:
         logger.info(f" - {t['host']} interval={t['interval']} http_code={t['http_code']}")
 
-    run_once(parsed, verbose=args.verbose)
+    run_forever(parsed, verbose=args.verbose)
     return parsed
