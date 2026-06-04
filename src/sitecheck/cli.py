@@ -2,6 +2,9 @@ import argparse
 import sys
 from urllib.parse import urlparse
 
+from .logger import get_tg_logger
+from .monitor import run_once
+
 
 def _ensure_scheme(url: str) -> str:
     parsed = urlparse(url)
@@ -43,16 +46,19 @@ def main(argv=None):
 
     args = parser.parse_args(argv)
 
+    logger = get_tg_logger('sitecheck', verbose=args.verbose)
+
     parsed = []
     for t in args.targets:
         try:
             parsed.append(parse_target(t))
         except Exception as e:
-            print(f"Error parsing target '{t}': {e}", file=sys.stderr)
+            logger.error(f"Error parsing target '{t}': {e}")
             sys.exit(2)
 
-    print(f"Parsed {len(parsed)} targets (verbose={args.verbose}):")
+    logger.info(f"Parsed {len(parsed)} targets (verbose={args.verbose})")
     for t in parsed:
-        print(f" - {t['host']} interval={t['interval']} http_code={t['http_code']}")
+        logger.info(f" - {t['host']} interval={t['interval']} http_code={t['http_code']}")
 
+    run_once(parsed, verbose=args.verbose)
     return parsed
