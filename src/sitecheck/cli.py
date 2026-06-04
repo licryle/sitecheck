@@ -56,9 +56,10 @@ def main(argv=None):
             logger.error(f"Error parsing target '{t}': {e}")
             sys.exit(2)
 
-    logger.info(f"Parsed {len(parsed)} targets (verbose={args.verbose})")
+    parsed_str = f"We will monitor {len(parsed)} targets (verbose={args.verbose}):\n"
     for t in parsed:
-        logger.info(f" - {t['host']} interval={t['interval']} http_code={t['http_code']}")
+        parsed_str = parsed_str + f" - {t['host']} interval={t['interval']} seconds for http_code={t['http_code']}\n"
+    logger.info(parsed_str)
 
     run_forever(parsed, verbose=args.verbose)
     return parsed

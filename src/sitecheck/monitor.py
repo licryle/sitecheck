@@ -34,31 +34,15 @@ def check_host(target: Dict[str, Any], timeout: int = 10) -> Tuple[bool, Any]:
         return False, e
 
 
-def run_once(targets: List[Dict[str, Any]], verbose: bool = False) -> None:
-    """Run a single check pass for all targets. Prints results to stdout.
-
-    This intentionally avoids configuring Python `logging` so the caller can
-    manage logging behavior. Output is simple and intended for review.
-    """
-    logger = get_tg_logger('sitecheck', verbose=verbose)
-
-    for t in targets:
-        success, info = check_host(t)
-        if success:
-            logger.info(f"{t['host']} OK (status={info})")
-        else:
-            logger.error(f"{t['host']} FAILED ({info})")
-
-
 def _start_check_thread(target: Dict[str, Any], logger, timeout: int = 10):
     """Start a daemon thread to run a single check for `target` and log result."""
 
     def _runner():
         success, info = check_host(target, timeout=timeout)
         if success:
-            logger.info(f"{target['host']} OK (status={info})")
+            logger.info(f"✅ {target['host']} OK (status={info}) ✅")
         else:
-            logger.error(f"{target['host']} FAILED ({info})")
+            logger.error(f"❌ {target['host']} FAILED (status={info}, expected={target['http_code']}) ❌")
 
     th = threading.Thread(target=_runner, daemon=True)
     th.start()
@@ -97,4 +81,4 @@ def run_forever(targets: List[Dict[str, Any]], verbose: bool = False, timeout: i
         logger.info("Shutting down monitor...")
 
 
-__all__ = ["check_host", "run_once", "run_forever"]
+__all__ = ["check_host", "run_forever"]
