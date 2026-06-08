@@ -42,6 +42,7 @@ def parse_target(s: str):
 def main(argv=None):
     parser = argparse.ArgumentParser(prog="sitecheck", description="Site accessibility monitor (baby-step CLI)")
     parser.add_argument('-v', '--verbose', action='store_true', help='Enable verbose output')
+    parser.add_argument('-s', '--summary-interval', type=int, help='Summary interval in hours')
     parser.add_argument('targets', nargs='*', help='Targets in format URL,interval[,http_code]')
 
     args = parser.parse_args(argv)
@@ -61,5 +62,5 @@ def main(argv=None):
         parsed_str = parsed_str + f" - {t['host']} interval={t['interval']} seconds for http_code={t['http_code']}\n"
     logger.info(parsed_str)
 
-    run_forever(parsed, verbose=args.verbose)
+    run_forever(parsed, verbose=args.verbose, summary_interval=args.summary_interval)
     return parsed
