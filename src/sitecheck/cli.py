@@ -1,6 +1,7 @@
 import argparse
 import sys
 from urllib.parse import urlparse
+from venv import logger
 
 from .logger import get_tg_logger
 from .monitor import run_forever
@@ -61,6 +62,10 @@ def main(argv=None):
     for t in parsed:
         parsed_str = parsed_str + f" - {t['host']} interval={t['interval']} seconds for http_code={t['http_code']}\n"
     logger.info(parsed_str)
+    
+    logger.info(f"We will give you a summary every {args.summary_interval} hours." if args.summary_interval else "No summary interval configured, no summary will be provided.")
+
+    logger.info("Starting sitecheck monitor.")
 
     run_forever(parsed, verbose=args.verbose, summary_interval=args.summary_interval)
     return parsed

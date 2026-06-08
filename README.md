@@ -23,6 +23,7 @@ python -m sitecheck -v google.com,30 httpbin.org/status/204,60,204
 ```
 
 - `-v` / `--verbose` enables more verbose output.
+- `-s` / `--ssummary_interval` to provide every X hours a summary of availability.
 - Each positional target must be `URL,interval[,http_code]`.
 - If the URL does not include a scheme, `https://` is added automatically.
 
@@ -65,6 +66,7 @@ Example:
 ## Environment variables
 
 - `TARGETS` — JSON list used by the Docker entrypoint.
+- `SUMMARY_INTERVAL` — An int to present the number of hours between 2 availability summaries. Do not provide, or 0 to disable.
 - `TELEGRAM_BOT_TOKEN` — Telegram bot token for notifications.
 - `TELEGRAM_CHAT_IDS_DEBUG` — comma-separated chat IDs for debug messages.
 - `TELEGRAM_CHAT_IDS_INFO` — comma-separated chat IDs for info messages.

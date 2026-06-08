@@ -47,6 +47,10 @@ def main():
             print(str(exc), file=sys.stderr)
             return 1
 
+    summary = os.getenv("SUMMARY_INTERVAL", "0")
+    if summary.isdigit() and int(summary) > 0:
+        args.append(f"--summary-interval={summary}")
+
     os.execvp(sys.executable, [sys.executable, "-m", "sitecheck"] + args)
 
 
