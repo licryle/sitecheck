@@ -44,7 +44,7 @@ def check_host(target: Dict[str, Any], timeout: int = 10) -> Tuple[bool, Any]:
         return False, e
 
 
-def _send_summary(target: Dict[str, Any], stats: TargetStats, logger) -> None:
+def _compile_summary(target: Dict[str, Any], stats: TargetStats, logger) -> None:
     """Generate and log a summary for a target."""
     if stats.total_checks == 0:
         return
@@ -61,27 +61,57 @@ def _send_summary(target: Dict[str, Any], stats: TargetStats, logger) -> None:
     else:
         icon = "🔴"
 
-    # Calculate trailing failures
-    consecutive_failures = 0
-    for _, success in reversed(stats.history):
-        if not success:
-            consecutive_failures += 1
+    # Find all failure intervals
+    failure_intervals = []
+    hist = list(stats.history)
+    now = datetime.now()
+    
+    i = 0
+    while i < len(hist):
+        if not hist[i][1]:  # Failure
+            start_time = hist[i][0]
+            last_failure_time = hist[i][0]
+            j = i + 1
+            while j < len(hist) and not hist[j][1]:
+                last_failure_time = hist[j][0]
+                j += 1
+            
+            # We found a block of failures from i to j-1
+            end_time = last_failure_time
+            if j == len(hist):
+                # It's the current ongoing failure
+                end_time = now
+            
+            duration = end_time - start_time
+            failure_intervals.append({
+                'start': start_time,
+                'end': end_time,
+                'duration': duration
+            })
+            i = j
         else:
-            break
-    
-    failure_msg = ""
-    if consecutive_failures > 0:
-        failure_msg = f"\n⚠️ Consecutive failures: {consecutive_failures}"
+            i += 1
 
-    summary_msg = (
-        f"{icon} **Summary for {target['host']}**\n"
-        f"Success Rate: {success_rate:.2f}%\n"
-        f"Total Checks: {stats.total_checks}"
-        f"{failure_msg}"
-    )
-    
-    # Using info level as requested for "priority_info"
-    logger.info(f"📊 {summary_msg}")
+    # Format downtime string
+    downtime_str = ""
+    if failure_intervals:
+        parts = []
+        for interval in failure_intervals:
+            total_seconds = int(interval['duration'].total_seconds())
+            if total_seconds < 60:
+                dur_str = f"{total_seconds}s"
+            elif total_seconds < 3600:
+                dur_str = f"{total_seconds // 60}m"
+            else:
+                dur_str = f"{total_seconds // 3600}h { (total_seconds % 3600) // 60}m"
+            
+            start_str = interval['start'].strftime("%H:%M")
+            end_str = interval['end'].strftime("%H:%M")
+            parts.append(f"{dur_str} {start_str}-{end_str}")
+        
+        downtime_str = f" - Down for {', '.join(parts)}"
+
+    return f"{icon} up {success_rate:.0f}% {target['host']}{downtime_str}"
 
 
 def run_forever(targets: List[Dict[str, Any]], verbose: bool = False, timeout: int = 10, summary_interval: int = None) -> None:
@@ -104,7 +134,7 @@ def run_forever(targets: List[Dict[str, Any]], verbose: bool = False, timeout: i
     stats_map: Dict[int, TargetStats] = {idx: TargetStats() for idx in range(len(targets))}
     
     # Track last summary time for each target
-    last_summary_timestamps = {idx: datetime.now() for idx in range(len(targets))}
+    last_summary_timestamps = datetime.now()
 
     tick = 0
     try:
@@ -141,10 +171,13 @@ def run_forever(targets: List[Dict[str, Any]], verbose: bool = False, timeout: i
                         daemon=True
                     ).start()
 
-                # Check if it's time for a summary
-                if summary_interval and (now - last_summary_timestamps[idx]).total_seconds() >= summary_interval * 3600:
-                    _send_summary(t, stats, logger)
-                    last_summary_timestamps[idx] = now
+            # Check if it's time for a summary
+            if summary_interval and (now - last_summary_timestamps).total_seconds() >= summary_interval * 36:
+                summary = f"📊 Last {summary_interval} hours summary:\n"
+                for idx, t in enumerate(targets):
+                    summary += _compile_summary(t, stats_map[idx], logger) + "\n"
+                logger.priority_info(summary[:-1])
+                last_summary_timestamps = now
 
             tick += 1
             time.sleep(1)
