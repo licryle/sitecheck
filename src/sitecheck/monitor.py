@@ -172,7 +172,7 @@ def run_forever(targets: List[Dict[str, Any]], verbose: bool = False, timeout: i
                     ).start()
 
             # Check if it's time for a summary
-            if summary_interval and (now - last_summary_timestamps).total_seconds() >= summary_interval * 36:
+            if summary_interval and (now - last_summary_timestamps).total_seconds() >= summary_interval * 3600:
                 summary = f"📊 Last {summary_interval} hours summary:\n"
                 for idx, t in enumerate(targets):
                     summary += _compile_summary(t, stats_map[idx], logger) + "\n"
