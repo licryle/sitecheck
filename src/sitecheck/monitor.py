@@ -111,7 +111,7 @@ def _compile_summary(target: Dict[str, Any], stats: TargetStats, logger) -> None
         
         downtime_str = f" - Down for {', '.join(parts)}"
 
-    return f"{icon} up {success_rate:.0f}% {target['host']}{downtime_str}"
+    return f"{icon} {success_rate:.0f}% {target['host']}{downtime_str}"
 
 
 def run_forever(targets: List[Dict[str, Any]], verbose: bool = False, timeout: int = 10, summary_interval: int = None) -> None:
