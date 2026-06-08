@@ -53,9 +53,9 @@ def _send_summary(target: Dict[str, Any], stats: TargetStats, logger) -> None:
     
     # Determine icon
     if success_rate == 100:
-        icon = "🟢"
-    elif success_rate > 99:
         icon = "✅"
+    elif success_rate >= 99:
+        icon = "🟢"
     elif success_rate >= 90:
         icon = "🟠"
     else:
