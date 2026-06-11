@@ -71,9 +71,11 @@ def _compile_summary(target: Dict[str, Any], stats: TargetStats, logger) -> None
         if not hist[i][1]:  # Failure
             start_time = hist[i][0]
             last_failure_time = hist[i][0]
+            failure_count = 1
             j = i + 1
             while j < len(hist) and not hist[j][1]:
                 last_failure_time = hist[j][0]
+                failure_count += 1
                 j += 1
             
             # We found a block of failures from i to j-1
@@ -86,30 +88,40 @@ def _compile_summary(target: Dict[str, Any], stats: TargetStats, logger) -> None
             failure_intervals.append({
                 'start': start_time,
                 'end': end_time,
-                'duration': duration
+                'duration': duration,
+                'count': failure_count,
             })
             i = j
         else:
             i += 1
 
-    # Format downtime string
+    # Format downtime and fluke summary
     downtime_str = ""
-    if failure_intervals:
-        parts = []
-        for interval in failure_intervals:
-            total_seconds = int(interval['duration'].total_seconds())
-            if total_seconds < 60:
-                dur_str = f"{total_seconds}s"
-            elif total_seconds < 3600:
-                dur_str = f"{total_seconds // 60}m"
-            else:
-                dur_str = f"{total_seconds // 3600}h { (total_seconds % 3600) // 60}m"
-            
-            start_str = interval['start'].strftime("%H:%M")
-            end_str = interval['end'].strftime("%H:%M")
-            parts.append(f"{dur_str} {start_str}-{end_str}")
+    fluke_count = sum(interval['count'] for interval in failure_intervals if interval['count'] == 1)
+    downtime_parts = []
+    for interval in failure_intervals:
+        if interval['count'] == 1:
+            continue
+
+        total_seconds = int(interval['duration'].total_seconds())
+        if total_seconds < 60:
+            dur_str = f"{total_seconds}s"
+        elif total_seconds < 3600:
+            dur_str = f"{total_seconds // 60}m"
+        else:
+            dur_str = f"{total_seconds // 3600}h {(total_seconds % 3600) // 60}m"
         
-        downtime_str = f" - Down for {', '.join(parts)}"
+        start_str = interval['start'].strftime("%H:%M")
+        end_str = interval['end'].strftime("%H:%M")
+        downtime_parts.append(f"{dur_str} {start_str}-{end_str}")
+
+    summary_parts = []
+    if fluke_count:
+        summary_parts.append(f"{fluke_count} fluke{'s' if fluke_count != 1 else ''}")
+    if downtime_parts:
+        summary_parts.append(f"Down for {', '.join(downtime_parts)}")
+    if summary_parts:
+        downtime_str = f" - {' - '.join(summary_parts)}"
 
     return f"{icon} {success_rate:.0f}% {target['host']}{downtime_str}"
 
