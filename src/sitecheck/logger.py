@@ -10,6 +10,7 @@ def _env(name: str, default: str = "") -> str:
 _LEVEL_CHAT_ENV: Dict[int, str] = {
     logging.DEBUG:          'TELEGRAM_CHAT_IDS_DEBUG',
     logging.INFO:           'TELEGRAM_CHAT_IDS_INFO',
+    logging.PRIORITY_INFO:  'TELEGRAM_CHAT_IDS_PRIORITY_INFO',
     logging.WARNING:        'TELEGRAM_CHAT_IDS_WARNING',
     logging.ERROR:          'TELEGRAM_CHAT_IDS_ERROR',
     logging.CRITICAL:       'TELEGRAM_CHAT_IDS_CRITICAL',
