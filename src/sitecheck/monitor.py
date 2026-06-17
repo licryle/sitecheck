@@ -44,10 +44,10 @@ def check_host(target: Dict[str, Any], timeout: int = 10) -> Tuple[bool, Any]:
         return False, e
 
 
-def _compile_summary(target: Dict[str, Any], stats: TargetStats, logger) -> None:
+def _compile_summary(target: Dict[str, Any], stats: TargetStats, logger) -> str:
     """Generate and log a summary for a target."""
     if stats.total_checks == 0:
-        return
+        return ""
 
     success_rate = (stats.success_count / stats.total_checks) * 100
     
@@ -61,48 +61,50 @@ def _compile_summary(target: Dict[str, Any], stats: TargetStats, logger) -> None
     else:
         icon = "🔴"
 
-    # Find all failure intervals
+    # Find all failure intervals and flukes using precise transition rules.
+    # A single failure followed by a success is a fluke.
+    # A failure followed by another failure is downtime. Including "ongoing ones" at summary time.
     failure_intervals = []
-    hist = list(stats.history)
+    hist = sorted(stats.history, key=lambda entry: entry[0])
     now = datetime.now()
     
+    downtime_str = ""
+    fluke_count = 0
+    downtime_parts = []
+
     i = 0
     while i < len(hist):
-        if not hist[i][1]:  # Failure
-            start_time = hist[i][0]
-            last_failure_time = hist[i][0]
-            failure_count = 1
-            j = i + 1
-            while j < len(hist) and not hist[j][1]:
-                last_failure_time = hist[j][0]
-                failure_count += 1
-                j += 1
-            
-            # We found a block of failures from i to j-1
-            end_time = last_failure_time
-            if j == len(hist):
-                # It's the current ongoing failure
-                end_time = now
-            
+        if hist[i][1]:
+            i += 1
+            continue
+
+        start_time = hist[i][0]
+        failure_count = 1
+        j = i + 1
+        while j < len(hist) and not hist[j][1]:
+            failure_count += 1
+            j += 1
+
+        next_is_success = j < len(hist) and hist[j][1]
+        ongoing = j == len(hist)
+
+        if failure_count == 1:
+            if next_is_success:
+                fluke_count += 1
+        else:
+            end_time = hist[j - 1][0] if next_is_success else now
             duration = end_time - start_time
             failure_intervals.append({
                 'start': start_time,
                 'end': end_time,
                 'duration': duration,
                 'count': failure_count,
+                'ongoing': ongoing,
             })
-            i = j
-        else:
-            i += 1
 
-    # Format downtime and fluke summary
-    downtime_str = ""
-    fluke_count = sum(interval['count'] for interval in failure_intervals if interval['count'] == 1)
-    downtime_parts = []
+        i = j
+
     for interval in failure_intervals:
-        if interval['count'] == 1:
-            continue
-
         total_seconds = int(interval['duration'].total_seconds())
         if total_seconds < 60:
             dur_str = f"{total_seconds}s"
