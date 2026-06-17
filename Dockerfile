@@ -9,13 +9,14 @@ RUN useradd -u 1000 -m appuser
 
 WORKDIR /app
 
-# --- Python deps ---
-COPY requirements.txt .
-RUN pip install --no-cache-dir --upgrade pip && \
-    pip install --no-cache-dir -r requirements.txt
-
 # --- copy code ---
-COPY ./src/sitecheck ./sitecheck
+COPY ./src/sitecheck ./src/sitecheck
+
+# --- Python deps ---
+COPY pyproject.toml .
+
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip install .
 
 USER appuser
 

@@ -8,39 +8,35 @@
     flake-utils.lib.eachDefaultSystem (system:
       let
         pkgs = nixpkgs.legacyPackages.${system};
+        tglogging = pkgs.python3Packages.buildPythonPackage {
+          pname = "tglogging";
+          version = "unstable";
+          pyproject = true;
+          src = pkgs.fetchFromGitHub {
+            owner = "licryle";
+            repo = "tglogging";
+            rev = "v0.0.5";
+            hash = "sha256-gO+1E38lPL+9HyIJOEcSq8SHPcloYxMY/WJEf3zGddo=";
+          };
+          build-system = [
+            pkgs.python3Packages.setuptools
+          ];
+        };
+
+        pythonEnv = pkgs.python3.withPackages (ps: [
+          tglogging
+          ps.pytest
+          ps.requests
+          ps.python-dotenv
+        ]);
       in {
         devShells.default = pkgs.mkShell {
           packages = [
-            pkgs.python3
-            pkgs.python3Packages.pip
-            pkgs.python3Packages.setuptools
-            pkgs.python3Packages.wheel
-            pkgs.python3Packages.pytest
-            pkgs.python3Packages.pygments
-            pkgs.python3Packages.build
-            pkgs.python3Packages.cryptography
-            pkgs.python3Packages.pygithub
-            pkgs.python3Packages.gitpython
+            pythonEnv
 
             pkgs.gitleaks
             pkgs.podman
           ];
-          shellHook = ''
-            if [ ! -d "env" ]; then
-              virtualenv env
-            fi
-
-            source env/bin/activate
-
-            export PIP_DISABLE_PIP_VERSION_CHECK=1
-            export PYTHONPATH=$PWD/src:$PYTHONPATH
-
-            if [ requirements.txt -nt env/.pip_installed ]; then
-              python -m pip install --upgrade pip
-              python -m pip install -r requirements.txt
-              touch env/.pip_installed
-            fi
-          '';
         };
       });
 }

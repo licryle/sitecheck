@@ -11,21 +11,28 @@ Key features
 ## Install
 
 ```bash
-python -m venv env
-source env/bin/activate  # on Windows: env\Scripts\activate
-pip install -r requirements.txt
+direnv allow
 ```
 
 ## Run locally
 
 ```bash
-python -m sitecheck -v google.com,30 httpbin.org/status/204,60,204
+PYTHONPATH=src python -m sitecheck -v google.com,30 httpbin.org/status/204,60,204 -s 1
+
+# or with .env
+PYTHONPATH=src env $(cat .env) python -m sitecheck
 ```
 
 - `-v` / `--verbose` enables more verbose output.
-- `-s` / `--ssummary_interval` to provide every X hours a summary of availability.
+- `-s` / `--summary_interval` to provide every X hours a summary of availability.
 - Each positional target must be `URL,interval[,http_code]`.
 - If the URL does not include a scheme, `https://` is added automatically.
+
+## Tests
+```bash
+pytest
+```
+
 
 ## Docker usage
 
@@ -41,7 +48,7 @@ Run with `TARGETS` JSON:
 docker run --rm -e TARGETS='[
   {"host":"https://google.com","interval":30},
   {"host":"https://example.com/health","interval":60,"http_code":200}
-]' sitecheck
+]' -e SUMMARY_INTERVAL='24' sitecheck
 ```
 
 The container entrypoint is `src/docker_entry.py`, which validates `TARGETS` and then executes `python -m sitecheck`.

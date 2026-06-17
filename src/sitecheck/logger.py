@@ -1,7 +1,7 @@
 import os
 import logging
 from typing import Dict, List
-from tglogging import configure_logger, LoggingConfig
+from tglogging import get_logger, LoggingConfig
 
 def _env(name: str, default: str = "") -> str:
     return os.getenv(name, default)
@@ -42,7 +42,8 @@ def get_tg_logger(name: str = 'sitecheck', verbose: bool = False):
         log_file_path=_env('LOG_FILE') or None,
         telegram_bot_token=_env('TELEGRAM_BOT_TOKEN') or None,
         level_chat_ids=_build_level_chat_ids(),
+        verbose=verbose
     )
-    logger = configure_logger(name, cfg, verbose=verbose)
+    logger = get_logger(name, cfg)
     cache[name] = logger
     return logger
