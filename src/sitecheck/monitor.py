@@ -193,6 +193,13 @@ def run_forever(targets: List[Dict[str, Any]], verbose: bool = False, timeout: i
                 logger.priority_info(summary[:-1])
                 last_summary_timestamps = now
 
+                # Reset stats after the summary so the next report counts only
+                # checks that happened since this summary.
+                for stats in stats_map.values():
+                    stats.total_checks = 0
+                    stats.success_count = 0
+                    stats.history.clear()
+
             tick += 1
             time.sleep(1)
     except KeyboardInterrupt:
