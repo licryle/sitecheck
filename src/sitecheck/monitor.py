@@ -161,7 +161,7 @@ def run_forever(targets: List[Dict[str, Any]], verbose: bool = False, timeout: i
                 # Run immediately on tick 0, then every `interval` seconds
                 if tick % interval == 0:
                     # We use a wrapper to update stats
-                    def _wrapped_check(target_idx, target_dict, logger_obj, stats_obj, timeout_val):
+                    def _wrapped_check(target_idx, target_dict, logger_obj, stats_obj, max_stats, timeout_val):
                         success, info = check_host(target_dict, timeout=timeout_val)
                         
                         # Update stats
@@ -170,8 +170,8 @@ def run_forever(targets: List[Dict[str, Any]], verbose: bool = False, timeout: i
                             stats_obj.success_count += 1
                         stats_obj.history.append((datetime.now(), success))
                         
-                        # Keep history manageable (e.g., last 1000 checks)
-                        if len(stats_obj.history) > 1000:
+                        # Keep history manageable
+                        if len(stats_obj.history) > max_stats:
                             stats_obj.history.popleft()
 
                         if success:
@@ -181,7 +181,7 @@ def run_forever(targets: List[Dict[str, Any]], verbose: bool = False, timeout: i
 
                     threading.Thread(
                         target=_wrapped_check, 
-                        args=(idx, t, logger, stats, timeout),
+                        args=(idx, t, logger, stats, summary_interval * 3600 if summary_interval else 0, timeout),
                         daemon=True
                     ).start()
 
