@@ -23,8 +23,8 @@ def _validate_target(item, index):
     parts = [host, str(interval)]
     if http_code is not None:
         parts.append(str(http_code))
-    if retry:
-        parts.append(str(retry))
+        if retry:
+            parts.append(str(retry))
     return ",".join(parts)
 
 
