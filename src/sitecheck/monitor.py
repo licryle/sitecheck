@@ -23,25 +23,37 @@ class TargetStats:
         self.last_summary_time = None
 
 
-def check_host(target: Dict[str, Any], timeout: int = 10) -> Tuple[bool, Any]:
+class RetryStatus(int):
+    """HTTP status code for a check that succeeded after a retry."""
+
+    recovered = True
+
+
+def check_host(target: Dict[str, Any], timeout: int = 10, retry: int = 0) -> Tuple[bool, Any]:
     """Check a single host.
 
     Returns (success, status_or_exception).
     """
     url = target.get("host")
     expected = target.get("http_code", 200)
+    retries = int(target.get("retry", retry))
+    if retries < 0:
+        raise ValueError("retry must be a non-negative integer")
 
-    try:
-        if requests is None:
-            raise RuntimeError("requests library not installed")
+    for attempt in range(retries + 1):
+        try:
+            if requests is None:
+                raise RuntimeError("requests library not installed")
 
-        resp = requests.get(url, timeout=timeout)
-        if resp.status_code == expected:
-            return True, resp.status_code
-        else:
-            return False, resp.status_code
-    except Exception as e:
-        return False, e
+            resp = requests.get(url, timeout=timeout)
+            if resp.status_code == expected:
+                status = RetryStatus(resp.status_code) if attempt else resp.status_code
+                return True, status
+            last_result = resp.status_code
+        except Exception as exc:
+            last_result = exc
+
+    return False, last_result
 
 
 def _compile_summary(target: Dict[str, Any], stats: TargetStats, logger) -> str:
@@ -162,19 +174,32 @@ def run_forever(targets: List[Dict[str, Any]], verbose: bool = False, timeout: i
                 if tick % interval == 0:
                     # We use a wrapper to update stats
                     def _wrapped_check(target_idx, target_dict, logger_obj, stats_obj, max_stats, timeout_val):
-                        success, info = check_host(target_dict, timeout=timeout_val)
+                        success, info = check_host(
+                            target_dict,
+                            timeout=timeout_val,
+                            retry=target_dict.get("retry", 0),
+                        )
                         
                         # Update stats
                         stats_obj.total_checks += 1
                         if success:
                             stats_obj.success_count += 1
-                        stats_obj.history.append((datetime.now(), success))
+                        if success and getattr(info, "recovered", False):
+                            recovery_time = datetime.now()
+                            stats_obj.history.append((recovery_time, False))
+                            stats_obj.history.append((recovery_time, True))
+                        else:
+                            stats_obj.history.append((datetime.now(), success))
                         
                         # Keep history manageable
                         if len(stats_obj.history) > max_stats:
                             stats_obj.history.popleft()
 
-                        if success:
+                        if success and getattr(info, "recovered", False):
+                            logger_obj.warning(
+                                f"⚠️ {target_dict['host']} recovered after retry (status={info}) ⚠️"
+                            )
+                        elif success:
                             logger_obj.info(f"✅ {target_dict['host']} OK (status={info}) ✅")
                         else:
                             logger_obj.error(f"❌ {target_dict['host']} FAILED (status={info}, expected={target_dict['http_code']}) ❌")

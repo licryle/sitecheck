@@ -10,16 +10,21 @@ def _validate_target(item, index):
     host = item.get("host")
     interval = item.get("interval")
     http_code = item.get("http_code")
+    retry = item.get("retry", 0)
 
     if not host or interval is None:
         raise ValueError(f"TARGETS[{index}] missing required host or interval")
 
     if not isinstance(interval, int):
         raise ValueError(f"TARGETS[{index}] interval must be an integer")
+    if not isinstance(retry, int) or isinstance(retry, bool) or retry < 0:
+        raise ValueError(f"TARGETS[{index}] retry must be a non-negative integer")
 
     parts = [host, str(interval)]
     if http_code is not None:
         parts.append(str(http_code))
+    if retry:
+        parts.append(str(retry))
     return ",".join(parts)
 
 

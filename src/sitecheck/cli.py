@@ -17,7 +17,7 @@ def _ensure_scheme(url: str) -> str:
 def parse_target(s: str):
     parts = [p.strip() for p in s.split(',')]
     if len(parts) < 2:
-        raise ValueError("expected format: URL,interval[,http_code]")
+        raise ValueError("expected format: URL,interval[,http_code[,retry]]")
 
     host = parts[0]
     try:
@@ -32,19 +32,28 @@ def parse_target(s: str):
         except Exception:
             raise ValueError("http_code must be an integer")
 
+    retry = 0
+    if len(parts) >= 4 and parts[3] != "":
+        try:
+            retry = int(parts[3])
+        except Exception:
+            raise ValueError("retry must be an integer")
+        if retry < 0:
+            raise ValueError("retry must be a non-negative integer")
+
     host = _ensure_scheme(host)
 
     if interval <= 0:
         raise ValueError("interval must be a positive integer")
 
-    return {"host": host, "interval": interval, "http_code": http_code}
+    return {"host": host, "interval": interval, "http_code": http_code, "retry": retry}
 
 
 def main(argv=None):
     parser = argparse.ArgumentParser(prog="sitecheck", description="Site accessibility monitor (baby-step CLI)")
     parser.add_argument('-v', '--verbose', action='store_true', help='Enable verbose output')
     parser.add_argument('-s', '--summary-interval', type=int, help='Summary interval in hours')
-    parser.add_argument('targets', nargs='*', help='Targets in format URL,interval[,http_code]')
+    parser.add_argument('targets', nargs='*', help='Targets in format URL,interval[,http_code[,retry]]')
 
     args = parser.parse_args(argv)
 
@@ -60,7 +69,7 @@ def main(argv=None):
 
     parsed_str = f"We will monitor {len(parsed)} targets (verbose={args.verbose}):\n"
     for t in parsed:
-        parsed_str = parsed_str + f" - {t['host']} interval={t['interval']} seconds for http_code={t['http_code']}\n"
+        parsed_str = parsed_str + f" - {t['host']} interval={t['interval']} seconds for http_code={t['http_code']} retry={t['retry']}\n"
     logger.info(parsed_str)
     
     logger.info(f"We will give you a summary every {args.summary_interval} hours." if args.summary_interval else "No summary interval configured, no summary will be provided.")

@@ -3,8 +3,8 @@
 sitecheck is a small Python utility that monitors HTTP endpoints and reports accessibility via `tglogging` (Telegram) or the console.
 
 Key features
-- Accepts short positional target arguments: `URL,interval[,http_code]` (e.g. `google.com,30` — `http_code` defaults to `200`).
-- Continuous monitor: the CLI starts a long-running loop that checks each host on its configured interval.
+- Accepts short positional target arguments: `URL,interval[,http_code[,retry]]` (e.g. `google.com,30` — `http_code` defaults to `200`, and `retry` defaults to `0` and is recommended to keep at `1` or `2` max).
+- Continuous monitor: the CLI starts a long-running loop that checks each host on its configured interval in seconds.
 - Docker-friendly: the container accepts a `TARGETS` JSON environment variable to declare targets.
 - Notifications: integrates with `tglogging` to send messages to Telegram when configured; falls back to console logging otherwise.
 
@@ -25,7 +25,7 @@ PYTHONPATH=src env $(cat .env) python -m sitecheck
 
 - `-v` / `--verbose` enables more verbose output.
 - `-s` / `--summary_interval` to provide every X hours a summary of availability.
-- Each positional target must be `URL,interval[,http_code]`.
+- Each positional target must be `URL,interval[,http_code[,retry]]`. `retry` is the number of additional checks after a failure. A recovery is logged as a warning; failures after all retries are logged as errors.
 - If the URL does not include a scheme, `https://` is added automatically.
 
 ## Tests
@@ -60,13 +60,14 @@ The container entrypoint is `src/docker_entry.py`, which validates `TARGETS` and
 - `host` (string) — URL to check.
 - `interval` (integer seconds) — how often to check this endpoint.
 - `http_code` (optional integer) — expected HTTP status code. Defaults to `200`.
+- `retry` (optional non-negative integer) — additional checks after a failed request. Defaults to `0`.
 
 Example:
 
 ```json
 [
   {"host":"https://google.com","interval":30},
-  {"host":"https://example.com/health","interval":60,"http_code":200}
+  {"host":"https://example.com/health","interval":60,"http_code":200,"retry":1}
 ]
 ```
 
